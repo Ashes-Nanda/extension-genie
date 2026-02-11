@@ -1,14 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Send, Download, CheckCircle, XCircle, AlertTriangle, FileCode, Loader2, Layers, Shield, Zap, LogOut, History } from "lucide-react";
+import { Layers, Loader2, LogOut, History, PanelLeftClose, PanelRightClose } from "lucide-react";
 import { streamChat, type Msg } from "@/lib/stream-chat";
-import { parseExtensionFiles, analyzeManifest, getPermissionDescription, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
+import { parseExtensionFiles, analyzeManifest, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
 import { createExtensionZip, createExtensionZipWithIcons, downloadBlob } from "@/lib/zip-export";
 import { generateIcons } from "@/lib/icon-generator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import CodeBlock from "@/components/CodeBlock";
 import { HistorySidebar } from "@/components/HistorySidebar";
+import { ChatPanel } from "@/components/workspace/ChatPanel";
+import { CodeViewer } from "@/components/workspace/CodeViewer";
+import { StatusPanel } from "@/components/workspace/StatusPanel";
+import { EmptyState } from "@/components/workspace/EmptyState";
+import { SuccessOverlay } from "@/components/workspace/SuccessOverlay";
 import "@/styles/prism-brutal.css";
 
 const Workspace = () => {
@@ -26,8 +30,19 @@ const Workspace = () => {
   const [activeFile, setActiveFile] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(loadProjectId);
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const fullResponseRef = useRef("");
+
+  // Mobile panel toggle
+  const [mobilePanel, setMobilePanel] = useState<"chat" | "code" | "status">("chat");
+
+  // Icon generation
+  const [isGeneratingIcons, setIsGeneratingIcons] = useState(false);
+  const [previewIcon, setPreviewIcon] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+
+  // Typing animation
+  const [visibleChars, setVisibleChars] = useState(0);
+  const isNewGeneration = useRef(false);
 
   // Load existing project
   useEffect(() => {
@@ -43,7 +58,6 @@ const Workspace = () => {
       supabase.from("project_messages").select("role, content").eq("project_id", id).order("created_at"),
       supabase.from("project_files").select("filename, content").eq("project_id", id),
     ]);
-
     if (msgData) {
       setMessages(msgData.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
     }
@@ -58,11 +72,9 @@ const Workspace = () => {
   const saveProject = async (msgs: Msg[], parsedFiles: ExtensionFile[], extMeta: ExtensionMeta) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
     const projectName = msgs.find((m) => m.role === "user")?.content.slice(0, 80) || "Untitled Extension";
 
     if (!projectId) {
-      // Create new project
       const { data, error } = await supabase
         .from("projects")
         .insert({ user_id: user.id, name: projectName, extension_type: extMeta.type })
@@ -72,17 +84,14 @@ const Workspace = () => {
       setProjectId(data.id);
       await saveProjectData(data.id, msgs, parsedFiles);
     } else {
-      // Update existing
       await supabase.from("projects").update({ extension_type: extMeta.type, updated_at: new Date().toISOString() }).eq("id", projectId);
       await saveProjectData(projectId, msgs, parsedFiles);
     }
   };
 
   const saveProjectData = async (pid: string, msgs: Msg[], parsedFiles: ExtensionFile[]) => {
-    // Replace messages and files
     await supabase.from("project_messages").delete().eq("project_id", pid);
     await supabase.from("project_files").delete().eq("project_id", pid);
-
     if (msgs.length > 0) {
       await supabase.from("project_messages").insert(
         msgs.map((m) => ({ project_id: pid, role: m.role, content: m.content }))
@@ -94,10 +103,6 @@ const Workspace = () => {
       );
     }
   };
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const processResponse = (fullText: string) => {
     const parsed = parseExtensionFiles(fullText);
@@ -116,7 +121,6 @@ const Workspace = () => {
     setInput("");
     setIsLoading(true);
     fullResponseRef.current = "";
-
     let assistantSoFar = "";
     const allMessages = [...messages, userMsg];
 
@@ -146,6 +150,8 @@ const Workspace = () => {
             }
             const allMsgs = [...allMessages, { role: "assistant" as const, content: fullResponseRef.current }];
             saveProject(allMsgs, parsed, newMeta);
+            // Switch to code view on mobile after generation
+            setMobilePanel("code");
           } else {
             processResponse(fullResponseRef.current);
           }
@@ -157,23 +163,16 @@ const Workspace = () => {
     }
   };
 
-  const [isGeneratingIcons, setIsGeneratingIcons] = useState(false);
-  const [previewIcon, setPreviewIcon] = useState<string | null>(null);
-  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
-
   const generatePreviewIcon = async () => {
     if (!files.length) return;
     try {
       setIsGeneratingPreview(true);
       const manifestFile = files.find((f) => f.name === "manifest.json");
       if (!manifestFile) return;
-      
       const icons = await generateIcons(manifestFile.content);
       const iconBlob = icons["icon128.png"];
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewIcon(reader.result as string);
-      };
+      reader.onloadend = () => setPreviewIcon(reader.result as string);
       reader.readAsDataURL(iconBlob);
     } catch (err) {
       console.warn("Preview generation failed:", err);
@@ -210,28 +209,18 @@ const Workspace = () => {
     }
   };
 
+  // Typing animation
   const activeFileContent = files.find((f) => f.name === activeFile)?.content || "";
 
-  // Typing animation
-  const [visibleChars, setVisibleChars] = useState(0);
-  const [animatingFile, setAnimatingFile] = useState("");
-  const isNewGeneration = useRef(false);
-
-  // Track when files change from generation (not tab switch)
   useEffect(() => {
-    if (isLoading) {
-      isNewGeneration.current = true;
-    }
+    if (isLoading) isNewGeneration.current = true;
   }, [isLoading]);
 
   useEffect(() => {
     if (isNewGeneration.current) {
       setVisibleChars(0);
-      setAnimatingFile(activeFile);
     } else {
-      // Tab switch on loaded project — show full content
       setVisibleChars(activeFileContent.length);
-      setAnimatingFile(activeFile);
     }
   }, [activeFile, activeFileContent]);
 
@@ -247,44 +236,53 @@ const Workspace = () => {
   }, [visibleChars, activeFileContent]);
 
   const displayedCode = activeFileContent.slice(0, visibleChars);
-
   const errors = meta.issues.filter((i) => i.level === "error");
   const warningsList = meta.issues.filter((i) => i.level === "warning");
   const infos = meta.issues.filter((i) => i.level === "info");
   const hasErrors = errors.length > 0;
   const isReady = files.length > 0 && !hasErrors;
 
-  const typeColorMap: Record<string, string> = {
-    content_script: "bg-accent-lime",
-    popup: "bg-accent-pink",
-    background: "bg-accent-purple",
-    hybrid: "bg-accent-yellow",
-    unknown: "bg-secondary",
-  };
-
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b-2 border-foreground bg-background">
+      <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b-2 border-foreground bg-background">
         <button onClick={() => navigate("/")} className="flex items-center gap-2.5 group">
           <div className="w-7 h-7 bg-foreground flex items-center justify-center transition-transform duration-150 group-hover:rotate-[-6deg]">
             <Layers className="h-4 w-4 text-background" />
           </div>
-          <span className="font-display text-base tracking-tight">EXTENSIO</span>
+          <span className="font-display text-base tracking-tight max-sm:hidden">EXTENSIO</span>
         </button>
+
+        {/* Mobile panel switcher */}
+        <div className="flex items-center gap-1 md:hidden">
+          {(["chat", "code", "status"] as const).map((panel) => (
+            <button
+              key={panel}
+              onClick={() => setMobilePanel(panel)}
+              className={`px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest border-2 border-foreground transition-all
+                ${mobilePanel === panel
+                  ? "bg-accent-lime text-foreground brutal-shadow-sm"
+                  : "bg-background text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              {panel === "chat" ? "Chat" : panel === "code" ? "Code" : "Status"}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowHistory(true)}
             className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
           >
-            <History className="h-3.5 w-3.5" /> History
+            <History className="h-3.5 w-3.5" /> <span className="max-sm:hidden">History</span>
           </button>
-          <span className="font-mono text-[9px] font-bold uppercase tracking-widest bg-accent-lime text-foreground px-2.5 py-1 border-2 border-foreground">
+          <span className="font-mono text-[9px] font-bold uppercase tracking-widest bg-accent-lime text-foreground px-2.5 py-1 border-2 border-foreground max-sm:hidden">
             Build Mode
           </span>
           {isLoading && (
             <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> Generating
+              <Loader2 className="h-3 w-3 animate-spin" /> <span className="max-sm:hidden">Generating</span>
             </span>
           )}
           <button
@@ -296,281 +294,59 @@ const Workspace = () => {
         </div>
       </div>
 
-      {/* 3-pane layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Chat */}
-        <div className="w-[360px] flex-shrink-0 flex flex-col border-r-2 border-foreground bg-background">
-          <div className="px-4 py-3 border-b-2 border-foreground bg-accent-pink/20">
-            <h3 className="font-display text-xs uppercase tracking-widest">Prompt Chat</h3>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={`animate-fade-in ${msg.role === "user" ? "ml-6" : "mr-4"}`}>
-                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5 font-bold">
-                  {msg.role === "user" ? "→ You" : "← Extensio"}
-                </div>
-                <div className={`p-3 text-sm border-2 border-foreground transition-all duration-200 ${
-                  msg.role === "user"
-                    ? "bg-accent-yellow/30 brutal-shadow-sm"
-                    : "bg-card brutal-shadow-sm"
-                }`}>
-                  <pre className="whitespace-pre-wrap font-sans break-words text-sm leading-relaxed">
-                    {msg.content.replace(/```[\s\S]*?```/g, "[code generated ↗]")}
-                  </pre>
-                </div>
-              </div>
-            ))}
-            {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-              <div className="flex items-center gap-2.5 p-3 border-2 border-foreground bg-accent-lime/20 brutal-shadow-sm animate-fade-in">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="font-mono text-xs font-bold uppercase tracking-widest">Building Extension…</span>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          <div className="p-3 border-t-2 border-foreground bg-secondary/50">
-            <div className="flex gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Describe changes…"
-                className="flex-1 p-3 border-2 border-foreground bg-background text-sm resize-none min-h-[64px] focus:outline-none focus:ring-2 focus:ring-primary font-mono placeholder:text-muted-foreground"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !isLoading) {
-                    sendMessage(input);
-                  }
-                }}
-              />
-              <button
-                onClick={() => input.trim() && !isLoading && sendMessage(input)}
-                disabled={!input.trim() || isLoading}
-                className="brutal-button bg-foreground text-background p-3 disabled:opacity-30 transition-all duration-150"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="font-mono text-[9px] text-muted-foreground mt-1.5 tracking-wider">⌘+Enter to send</p>
-          </div>
+      {/* 3-pane layout — desktop: side-by-side, mobile: tab-switched */}
+      <div className="flex-1 flex overflow-hidden max-md:flex-col">
+        {/* Chat panel */}
+        <div className={`md:flex flex-col ${mobilePanel === "chat" ? "flex" : "hidden md:flex"}`}>
+          <ChatPanel
+            messages={messages}
+            input={input}
+            onInputChange={setInput}
+            onSend={sendMessage}
+            isLoading={isLoading}
+          />
         </div>
 
-        {/* Center: Code */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Code panel */}
+        <div className={`flex-1 flex-col overflow-hidden ${mobilePanel === "code" ? "flex" : "hidden md:flex"}`}>
           {files.length > 0 ? (
-            <>
-              <div className="flex items-center border-b-2 border-foreground overflow-x-auto bg-secondary/30">
-                {files.map((f, i) => {
-                  const tabColors = ["bg-accent-pink", "bg-accent-lime", "bg-accent-yellow", "bg-accent-orange", "bg-accent-purple"];
-                  return (
-                    <button
-                      key={f.name}
-                      onClick={() => setActiveFile(f.name)}
-                      className={`px-4 py-2.5 font-mono text-[11px] font-bold border-r-2 border-foreground whitespace-nowrap transition-all duration-150 ${
-                        activeFile === f.name
-                          ? `${tabColors[i % tabColors.length]} text-foreground brutal-shadow-sm`
-                          : "hover:bg-secondary text-foreground/70 hover:text-foreground"
-                      }`}
-                    >
-                      <FileCode className="inline h-3 w-3 mr-1.5 -mt-0.5" />
-                      {f.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex-1 overflow-auto p-5 bg-card">
-                <CodeBlock code={displayedCode} filename={activeFile} />
-              </div>
-              <div className="px-5 py-2 border-t-2 border-foreground bg-secondary/30 flex items-center justify-between">
-                <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest">
-                  {files.length} file{files.length > 1 ? "s" : ""} generated
-                </p>
-                <p className="font-mono text-[9px] text-muted-foreground">
-                  {activeFile}
-                </p>
-              </div>
-            </>
+            <CodeViewer
+              files={files}
+              activeFile={activeFile}
+              displayedCode={displayedCode}
+              onSetActiveFile={setActiveFile}
+            />
           ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground bg-secondary/10">
-              <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-6 border-2 border-foreground/20 bg-accent-lime/10 flex items-center justify-center rotate-3">
-                  <FileCode className="h-8 w-8 text-foreground/20" />
-                </div>
-                <p className="font-display text-lg uppercase tracking-tight text-foreground/30">Code Appears Here</p>
-                <p className="font-mono text-[10px] text-muted-foreground mt-2">Submit a prompt to start building</p>
-              </div>
-            </div>
+            <EmptyState onSelectPrompt={(prompt) => {
+              setInput(prompt);
+              setMobilePanel("chat");
+            }} />
           )}
         </div>
 
-        {/* Right: Status */}
-        <div className="w-[290px] flex-shrink-0 border-l-2 border-foreground flex flex-col overflow-y-auto bg-background">
-          {/* Extension Type */}
-          <div className="p-4 border-b-2 border-foreground">
-            <h4 className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-3 font-bold flex items-center gap-1.5">
-              <Zap className="h-3 w-3" /> Extension Type
-            </h4>
-            <span className={`font-mono text-xs font-bold uppercase px-3 py-1.5 border-2 border-foreground inline-block brutal-shadow-sm ${typeColorMap[meta.type]}`}>
-              {meta.type === "unknown" ? "Awaiting Build" : meta.type.replace("_", " ")}
-            </span>
-          </div>
-
-          {/* Permissions */}
-          <div className="p-4 border-b-2 border-foreground">
-            <h4 className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-3 font-bold flex items-center gap-1.5">
-              <Shield className="h-3 w-3" /> Permissions
-            </h4>
-            {meta.permissions.length > 0 ? (
-              <ul className="space-y-2">
-                {meta.permissions.map((p) => {
-                  const isSensitive = ["<all_urls>", "cookies", "history", "webRequest", "bookmarks"].includes(p);
-                  return (
-                    <li key={p} className={`text-[11px] font-mono p-2 border-2 border-foreground ${
-                      isSensitive
-                        ? "bg-accent-pink/30 text-foreground font-bold"
-                        : "bg-accent-lime/20 text-foreground"
-                    }`}>
-                      {isSensitive && <AlertTriangle className="inline h-3 w-3 mr-1.5 -mt-0.5" />}
-                      {getPermissionDescription(p)}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-[11px] text-muted-foreground font-mono">No permissions detected</p>
-            )}
-          </div>
-
-          {/* Validation */}
-          <div className={`p-4 border-b-2 border-foreground ${hasErrors ? "bg-accent-pink/10" : ""}`}>
-            <h4 className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-3 font-bold">Validation</h4>
-            {files.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground font-mono">Waiting for generation…</p>
-            ) : (
-              <div className="space-y-2">
-                {errors.map((issue, i) => (
-                  <div key={`e-${i}`} className="flex items-start gap-2 text-[11px] font-mono p-2 border-2 border-foreground bg-destructive/10 text-destructive">
-                    <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {issue.message}
-                  </div>
-                ))}
-                {warningsList.map((issue, i) => (
-                  <div key={`w-${i}`} className="flex items-start gap-2 text-[11px] font-mono p-2 border-2 border-foreground bg-accent-orange/15 text-accent-orange">
-                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {issue.message}
-                  </div>
-                ))}
-                {infos.map((issue, i) => (
-                  <div key={`i-${i}`} className="flex items-start gap-2 text-[11px] font-mono p-2 border-2 border-foreground bg-secondary/50 text-muted-foreground">
-                    <FileCode className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {issue.message}
-                  </div>
-                ))}
-                {hasErrors && (
-                  <button
-                    onClick={() => sendMessage("Fix the following validation errors: " + errors.map(e => e.message).join(", "))}
-                    disabled={isLoading}
-                    className="brutal-button bg-accent-pink text-foreground px-3 py-2 text-[11px] mt-2 w-full disabled:opacity-40"
-                  >
-                    ⚡ Fix Automatically
-                  </button>
-                )}
-                {!hasErrors && (
-                  <div className="flex items-center gap-2 text-[11px] font-mono font-bold p-2 border-2 border-foreground bg-accent-lime/30 text-foreground">
-                    <CheckCircle className="h-4 w-4" /> Ready to install
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-           {/* Icon Preview */}
-           {files.length > 0 && (
-             <div className="p-4 border-b-2 border-foreground">
-               <h4 className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-3 font-bold flex items-center gap-1.5">
-                 <FileCode className="h-3 w-3" /> Icon Preview
-               </h4>
-               {previewIcon ? (
-                 <div className="flex flex-col items-center gap-3">
-                   <img
-                     src={previewIcon}
-                     alt="Extension icon preview"
-                     className="w-24 h-24 border-2 border-foreground bg-secondary p-2 image-pixelated"
-                   />
-                   <button
-                     onClick={generatePreviewIcon}
-                     disabled={isGeneratingPreview}
-                     className="brutal-button bg-secondary text-foreground px-3 py-1.5 text-[10px] w-full disabled:opacity-40"
-                   >
-                     {isGeneratingPreview ? "Regenerating..." : "Regenerate"}
-                   </button>
-                 </div>
-               ) : (
-                 <button
-                   onClick={generatePreviewIcon}
-                   disabled={isGeneratingPreview || !files.length}
-                   className="brutal-button bg-secondary text-foreground px-3 py-2 text-[10px] w-full disabled:opacity-40"
-                 >
-                   {isGeneratingPreview ? (
-                     <><Loader2 className="inline h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
-                   ) : (
-                     "Preview Icon"
-                   )}
-                 </button>
-               )}
-             </div>
-           )}
-
-           {/* Download */}
-          <div className="p-4 mt-auto">
-            <button
-              onClick={handleDownload}
-              disabled={files.length === 0 || isGeneratingIcons}
-              className="brutal-button bg-foreground text-background px-4 py-3.5 text-xs w-full disabled:opacity-30 flex items-center justify-center gap-2"
-            >
-              {isGeneratingIcons ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Generating Icons…</>
-              ) : (
-                <><Download className="h-4 w-4" /> Download ZIP</>
-              )}
-            </button>
-            {isReady && (
-              <p className="font-mono text-[9px] text-center text-muted-foreground mt-2 uppercase tracking-widest">
-                {files.length} files • {meta.type.replace("_", " ")}
-              </p>
-            )}
-          </div>
+        {/* Status panel */}
+        <div className={`md:flex flex-col ${mobilePanel === "status" ? "flex" : "hidden md:flex"}`}>
+          <StatusPanel
+            meta={meta}
+            files={files}
+            hasErrors={hasErrors}
+            isReady={isReady}
+            errors={errors}
+            warningsList={warningsList}
+            infos={infos}
+            isLoading={isLoading}
+            isGeneratingIcons={isGeneratingIcons}
+            isGeneratingPreview={isGeneratingPreview}
+            previewIcon={previewIcon}
+            onFixErrors={() => sendMessage("Fix the following validation errors: " + errors.map(e => e.message).join(", "))}
+            onDownload={handleDownload}
+            onGeneratePreviewIcon={generatePreviewIcon}
+          />
         </div>
       </div>
 
       {/* Download success overlay */}
-      {showSuccess && (
-        <div className="fixed inset-0 bg-foreground/60 flex items-center justify-center z-50 animate-fade-in" onClick={() => setShowSuccess(false)}>
-          <div className="brutal-card bg-card p-8 max-w-md mx-4 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-accent-lime border-2 border-foreground flex items-center justify-center brutal-shadow-sm">
-                <CheckCircle className="h-5 w-5" />
-              </div>
-              <h3 className="font-display text-xl tracking-tight">ZIP READY</h3>
-            </div>
-            <ol className="space-y-3 mb-8">
-              {[
-                { text: "Open chrome://extensions", color: "bg-accent-pink" },
-                { text: "Enable Developer Mode (top right toggle)", color: "bg-accent-lime" },
-                { text: 'Click "Load Unpacked"', color: "bg-accent-yellow" },
-                { text: "Select the unzipped folder", color: "bg-accent-purple" },
-              ].map((step, i) => (
-                <li key={i} className="flex gap-3 items-center">
-                  <span className={`font-mono text-xs font-bold ${step.color} text-foreground w-7 h-7 flex items-center justify-center flex-shrink-0 border-2 border-foreground brutal-shadow-sm`}>
-                    {i + 1}
-                  </span>
-                  <span className="font-mono text-sm">{step.text}</span>
-                </li>
-              ))}
-            </ol>
-            <button onClick={() => setShowSuccess(false)} className="brutal-button bg-foreground text-background px-4 py-2.5 text-xs w-full">
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
+      {showSuccess && <SuccessOverlay onClose={() => setShowSuccess(false)} />}
 
       {/* History Sidebar */}
       <HistorySidebar open={showHistory} onOpenChange={setShowHistory} />
