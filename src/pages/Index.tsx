@@ -67,6 +67,7 @@ const Index = () => {
             <a href="#process" className="hover:text-primary transition-colors">Process</a>
             <a href="#core" className="hover:text-primary transition-colors">Core</a>
             <a href="#safety" className="hover:text-primary transition-colors">Safety</a>
+            <button onClick={() => navigate("/pricing")} className="hover:text-primary transition-colors">Pricing</button>
           </div>
           {session ? (
             <button
