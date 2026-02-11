@@ -1,0 +1,4 @@
+project_id = "vcqmtvasahdskqrqqstc"
+
+[functions.generate-extension]
+verify_jwt = false
