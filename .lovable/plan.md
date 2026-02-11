@@ -1,118 +1,128 @@
 
 
-# Rework: Landing-Centric Flow + History Sidebar + Code Typing Animation
+# Auto-Generate Extension Icons with AI Image Generation
 
 ## Summary
-Three changes: (1) Make the landing page the hub -- prompt "Start Build" requires login, and after auth redirect back to landing, not dashboard. (2) Replace the dashboard with a slide-out history sidebar accessible from the landing page and workspace. (3) Add a typewriter animation to the code viewer so code appears character-by-character as it streams in.
+After an extension is generated, automatically create professional icons (16x16, 48x48, 128x128) using the Nano banana image model (`google/gemini-2.5-flash-image`), include them in the ZIP download, and update the manifest to reference them. This removes the current limitation where icons are intentionally omitted.
 
 ---
 
-## 1. Auth-Gated "Start Build" on Landing Page
+## Flow
 
-**Current behavior:** Clicking "Start Build" navigates to `/workspace` regardless of auth state. A separate "Dashboard" button exists for logged-in users.
+```text
+User clicks "Download ZIP"
+  |
+  v
+Extract extension name + description from manifest.json
+  |
+  v
+Call new edge function "generate-icon" with a prompt like:
+  "A simple, clean app icon for a Chrome extension called [name]: [description].
+   Flat design, solid background, no text, square, suitable for 128x128."
+  |
+  v
+Receive base64 PNG from Nano banana API
+  |
+  v
+Client-side: resize to 16x16, 48x48, 128x128 using canvas
+  |
+  v
+Inject icon files (icon16.png, icon48.png, icon128.png) into the ZIP
+  |
+  v
+Patch manifest.json in the ZIP to add the "icons" field
+  |
+  v
+Download the complete ZIP
+```
 
-**New behavior:**
-- When user clicks "Start Build" (or selects a template), check if they are logged in.
-- If NOT logged in, redirect to `/auth` with the prompt stored in the URL state (e.g., `navigate("/auth", { state: { redirectPrompt: prompt } })`).
-- After successful login/signup on `/auth`, redirect back to `/` with the prompt pre-filled, then auto-trigger navigation to `/workspace`.
-- The nav button changes from "Dashboard" to "History" (opens sidebar) when logged in.
+## Changes
 
-**Files changed:**
-- `src/pages/Index.tsx` -- gate `handleGenerate` behind auth check; change nav button from "Dashboard" to "History" toggle
-- `src/pages/Auth.tsx` -- accept `redirectPrompt` in location state; after auth, navigate to `/` with prompt in state instead of `/dashboard`
-- `src/App.tsx` -- remove `/dashboard` route; remove `Dashboard` import
+### 1. New Edge Function: `supabase/functions/generate-icon/index.ts`
 
-## 2. History Sidebar (Replaces Dashboard)
+- Accepts `{ prompt: string }` in the request body
+- Calls `https://ai.gateway.lovable.dev/v1/chat/completions` with:
+  - model: `google/gemini-2.5-flash-image`
+  - modalities: `["image", "text"]`
+  - A prompt crafted from the extension name/description
+- Returns the base64 image data as JSON: `{ imageBase64: "data:image/png;base64,..." }`
 
-**New component:** `src/components/HistorySidebar.tsx`
+### 2. New Utility: `src/lib/icon-generator.ts`
 
-A slide-out drawer/sheet from the right side containing the user's project history. Accessible from both the landing page nav and the workspace top bar.
+- `generateIconPrompt(manifest)` -- extracts name + description from the parsed manifest to build an image prompt
+- `resizeImage(base64, size)` -- uses an offscreen `<canvas>` to resize the returned image to 16, 48, and 128 pixels
+- `generateIcons(manifestContent)` -- orchestrates: calls the edge function, resizes, returns `{ "icon16.png": Blob, "icon48.png": Blob, "icon128.png": Blob }`
 
-**Contents:**
-- Header: "Your Builds" with close button
-- List of projects ordered by `updated_at` desc
-- Each item shows: project name (truncated), extension type badge, time ago
-- Click a project to navigate to `/workspace` with `projectId` in state
-- Delete button per project with confirmation
-- Sign out button at the bottom
-- Uses the existing Sheet component from shadcn
+### 3. Update `src/lib/zip-export.ts`
 
-**Files changed:**
-- Create `src/components/HistorySidebar.tsx`
-- `src/pages/Index.tsx` -- add sidebar state + trigger button in nav
-- `src/pages/Workspace.tsx` -- replace "Dashboard" link with history sidebar trigger
-- Delete `src/pages/Dashboard.tsx`
+- New function `createExtensionZipWithIcons(files, icons)` that:
+  - Adds the 3 icon blobs to the ZIP
+  - Patches the manifest.json content to include `"icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" }`
+  - Falls back to the current icon-less ZIP if generation fails
 
-## 3. Code Typing Animation
+### 4. Update `src/pages/Workspace.tsx`
 
-**Current behavior:** When code is generated, the full file content appears instantly in the `CodeBlock` component once files are parsed.
+- Modify `handleDownload` to:
+  - Show a "Generating icons..." loading state on the download button
+  - Call `generateIcons()` before creating the ZIP
+  - Pass icons to the updated ZIP function
+  - If icon generation fails (timeout/error), fall back to ZIP without icons and show a toast warning
 
-**New behavior:** Code appears with a typewriter effect, characters revealed progressively.
+### 5. Update System Prompt (edge function)
 
-**Approach:**
-- Track a `displayedLength` state that increments via `requestAnimationFrame` or `setInterval`
-- Slice the actual code content to `displayedLength` and pass that to `CodeBlock`
-- When `activeFile` changes or content updates, reset and re-animate
-- Speed: ~20-30 characters per frame for a fast but visible "writing" effect
-- When generation is still streaming, the animation keeps pace; once done, it catches up quickly
-
-**Files changed:**
-- `src/pages/Workspace.tsx` -- add typing animation state around the `CodeBlock` render in the center pane
+- Change rule 9 from "NEVER reference icon files" to: "Do NOT include an icons field in manifest.json -- icons will be auto-generated separately."
+- This keeps the AI from hallucinating icon references while we handle it programmatically.
 
 ---
 
 ## Technical Details
 
-### Auth Flow with Redirect
+### Edge Function: generate-icon
 
 ```text
-User types prompt -> clicks "Start Build"
-  |
-  v
-Logged in? --YES--> navigate("/workspace", { state: { prompt } })
-  |
-  NO
-  v
-navigate("/auth", { state: { redirectPrompt: prompt } })
-  |
-  v
-User logs in / signs up
-  |
-  v
-Auth.tsx detects session -> navigate("/", { state: { prompt: redirectPrompt } })
-  |
-  v
-Index.tsx picks up prompt from state -> auto-navigates to workspace
+POST /generate-icon
+Body: { "prompt": "A flat, minimal icon for..." }
+Response: { "imageBase64": "data:image/png;base64,iVBOR..." }
 ```
 
-### History Sidebar Structure
+Uses `LOVABLE_API_KEY` (already available). No new secrets needed.
 
-Uses the existing `Sheet` component (from `@/components/ui/sheet`):
-- `SheetTrigger` in the nav bar
-- `SheetContent` side="right" containing project list
-- Fetches projects from `supabase.from("projects")` on open
-- Each project card is clickable, navigates to workspace
+### Canvas Resizing
 
-### Typing Animation Logic
+The image model returns a large image. We resize client-side:
+- Create an offscreen canvas at each target size (16, 48, 128)
+- Draw the source image scaled to fit
+- Export as PNG blob via `canvas.toBlob()`
 
-```text
-- State: visibleChars (number), starts at 0
-- On activeFileContent change: reset visibleChars to 0
-- useEffect with setInterval (every 16ms, add ~20 chars)
-- displayedCode = activeFileContent.slice(0, visibleChars)
-- Pass displayedCode to CodeBlock
-- When visibleChars >= content.length, clear interval
-- Skip animation for user-initiated file tab switches on already-loaded projects
+### Manifest Patching
+
+Before zipping, parse manifest.json, inject:
+```json
+"icons": {
+  "16": "icon16.png",
+  "48": "icon48.png",
+  "128": "icon128.png"
+}
 ```
+Then re-serialize.
 
-### Files Summary
+### Download Button UX
+
+- Default: "Download ZIP"
+- During icon generation: spinner + "Generating icons..."
+- On success: ZIP downloads with icons included
+- On failure: ZIP downloads without icons + warning toast
+
+---
+
+## Files Summary
 
 | Action | File |
 |--------|------|
-| Create | `src/components/HistorySidebar.tsx` |
-| Modify | `src/pages/Index.tsx` |
-| Modify | `src/pages/Auth.tsx` |
+| Create | `supabase/functions/generate-icon/index.ts` |
+| Create | `src/lib/icon-generator.ts` |
+| Modify | `src/lib/zip-export.ts` |
 | Modify | `src/pages/Workspace.tsx` |
-| Modify | `src/App.tsx` |
-| Delete | `src/pages/Dashboard.tsx` |
+| Modify | `supabase/functions/generate-extension/index.ts` (system prompt tweak) |
+| Modify | `supabase/config.toml` (add generate-icon function config) |
 
