@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle } from "lucide-react";
+import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle, User } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
-
+import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 const Index = () => {
   const [prompt, setPrompt] = useState("");
+  const [session, setSession] = useState<Session | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
@@ -31,10 +39,27 @@ const Index = () => {
             </span>
           </div>
         </div>
-        <div className="flex gap-6 font-mono text-xs font-bold uppercase tracking-widest">
-          <a href="#process" className="hover:text-primary transition-colors">Process</a>
-          <a href="#core" className="hover:text-primary transition-colors">Core</a>
-          <a href="#safety" className="hover:text-primary transition-colors">Safety</a>
+        <div className="flex items-center gap-6">
+          <div className="flex gap-6 font-mono text-xs font-bold uppercase tracking-widest">
+            <a href="#process" className="hover:text-primary transition-colors">Process</a>
+            <a href="#core" className="hover:text-primary transition-colors">Core</a>
+            <a href="#safety" className="hover:text-primary transition-colors">Safety</a>
+          </div>
+          {session ? (
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="brutal-button bg-accent-lime text-foreground px-4 py-1.5 text-[10px] flex items-center gap-1.5"
+            >
+              <User className="h-3 w-3" /> Dashboard
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate("/auth")}
+              className="brutal-button bg-foreground text-background px-4 py-1.5 text-[10px] flex items-center gap-1.5"
+            >
+              <User className="h-3 w-3" /> Login
+            </button>
+          )}
         </div>
       </nav>
 
