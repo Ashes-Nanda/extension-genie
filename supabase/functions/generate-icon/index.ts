@@ -13,8 +13,14 @@ serve(async (req) => {
 
   try {
     const { prompt } = await req.json();
-    if (!prompt) {
-      return new Response(JSON.stringify({ error: "prompt is required" }), {
+    if (typeof prompt !== "string" || prompt.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "prompt is required and must be a non-empty string" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (prompt.length > 500) {
+      return new Response(JSON.stringify({ error: "Prompt too long (max 500 characters)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
