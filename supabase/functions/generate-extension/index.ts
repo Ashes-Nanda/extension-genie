@@ -17,6 +17,7 @@ CRITICAL RULES:
 6. Use chrome.scripting.executeScript instead of chrome.tabs.executeScript
 7. Permissions must be minimal — only what's needed
 8. Every file referenced in manifest.json MUST be generated
+9. NEVER reference icon files (icon.png, icon16.png, etc.) in manifest.json "icons" field. You cannot generate binary image files. Simply OMIT the "icons" field entirely from manifest.json. Do NOT include any "icons" key.
 
 OUTPUT FORMAT:
 Return each file as a fenced code block with the filename as the language identifier:
