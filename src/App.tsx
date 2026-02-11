@@ -11,6 +11,7 @@ import Workspace from "./pages/Workspace";
 import Auth from "./pages/Auth";
 
 import NotFound from "./pages/NotFound";
+import Pricing from "./pages/Pricing";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route path="/pricing" element={<Pricing />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
