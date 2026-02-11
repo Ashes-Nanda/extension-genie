@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle, User } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle, User, History } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { TemplateGallery } from "@/components/TemplateGallery";
+import { HistorySidebar } from "@/components/HistorySidebar";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 const Index = () => {
   const [prompt, setPrompt] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -17,8 +20,26 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Pick up prompt from auth redirect
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.prompt) {
+      setPrompt(state.prompt);
+      // Clear state so it doesn't re-trigger
+      window.history.replaceState({}, document.title);
+      // Auto-navigate to workspace if logged in
+      if (session) {
+        navigate("/workspace", { state: { prompt: state.prompt } });
+      }
+    }
+  }, [location.state, session]);
+
   const handleGenerate = () => {
     if (!prompt.trim()) return;
+    if (!session) {
+      navigate("/auth", { state: { redirectPrompt: prompt.trim() } });
+      return;
+    }
     navigate("/workspace", { state: { prompt: prompt.trim() } });
   };
 
@@ -49,10 +70,10 @@ const Index = () => {
           </div>
           {session ? (
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => setShowHistory(true)}
               className="brutal-button bg-accent-lime text-foreground px-4 py-1.5 text-[10px] flex items-center gap-1.5"
             >
-              <User className="h-3 w-3" /> Dashboard
+              <History className="h-3 w-3" /> History
             </button>
           ) : (
             <button
@@ -276,12 +297,16 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
       {/* Template Gallery Modal */}
       <TemplateGallery 
         isOpen={showTemplateGallery}
         onClose={() => setShowTemplateGallery(false)}
         onSelectTemplate={fillPrompt}
       />
+
+      {/* History Sidebar */}
+      <HistorySidebar open={showHistory} onOpenChange={setShowHistory} />
     </div>
   );
 };

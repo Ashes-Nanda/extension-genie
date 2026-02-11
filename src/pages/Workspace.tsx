@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Download, CheckCircle, XCircle, AlertTriangle, FileCode, Loader2, Layers, Shield, Zap, LogOut, LayoutDashboard } from "lucide-react";
+import { Send, Download, CheckCircle, XCircle, AlertTriangle, FileCode, Loader2, Layers, Shield, Zap, LogOut, History } from "lucide-react";
 import { streamChat, type Msg } from "@/lib/stream-chat";
 import { parseExtensionFiles, analyzeManifest, getPermissionDescription, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
 import { createExtensionZip, downloadBlob } from "@/lib/zip-export";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CodeBlock from "@/components/CodeBlock";
+import { HistorySidebar } from "@/components/HistorySidebar";
 import "@/styles/prism-brutal.css";
 
 const Workspace = () => {
@@ -14,6 +15,7 @@ const Workspace = () => {
   const navigate = useNavigate();
   const initialPrompt = (location.state as any)?.prompt || "";
   const loadProjectId = (location.state as any)?.projectId || null;
+  const [showHistory, setShowHistory] = useState(false);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -166,6 +168,43 @@ const Workspace = () => {
   };
 
   const activeFileContent = files.find((f) => f.name === activeFile)?.content || "";
+
+  // Typing animation
+  const [visibleChars, setVisibleChars] = useState(0);
+  const [animatingFile, setAnimatingFile] = useState("");
+  const isNewGeneration = useRef(false);
+
+  // Track when files change from generation (not tab switch)
+  useEffect(() => {
+    if (isLoading) {
+      isNewGeneration.current = true;
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (isNewGeneration.current) {
+      setVisibleChars(0);
+      setAnimatingFile(activeFile);
+    } else {
+      // Tab switch on loaded project — show full content
+      setVisibleChars(activeFileContent.length);
+      setAnimatingFile(activeFile);
+    }
+  }, [activeFile, activeFileContent]);
+
+  useEffect(() => {
+    if (visibleChars >= activeFileContent.length) {
+      isNewGeneration.current = false;
+      return;
+    }
+    const interval = setInterval(() => {
+      setVisibleChars((prev) => Math.min(prev + 25, activeFileContent.length));
+    }, 16);
+    return () => clearInterval(interval);
+  }, [visibleChars, activeFileContent]);
+
+  const displayedCode = activeFileContent.slice(0, visibleChars);
+
   const errors = meta.issues.filter((i) => i.level === "error");
   const warningsList = meta.issues.filter((i) => i.level === "warning");
   const infos = meta.issues.filter((i) => i.level === "info");
@@ -192,10 +231,10 @@ const Workspace = () => {
         </button>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => setShowHistory(true)}
             className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
           >
-            <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
+            <History className="h-3.5 w-3.5" /> History
           </button>
           <span className="font-mono text-[9px] font-bold uppercase tracking-widest bg-accent-lime text-foreground px-2.5 py-1 border-2 border-foreground">
             Build Mode
@@ -297,7 +336,7 @@ const Workspace = () => {
                 })}
               </div>
               <div className="flex-1 overflow-auto p-5 bg-card">
-                <CodeBlock code={activeFileContent} filename={activeFile} />
+                <CodeBlock code={displayedCode} filename={activeFile} />
               </div>
               <div className="px-5 py-2 border-t-2 border-foreground bg-secondary/30 flex items-center justify-between">
                 <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest">
@@ -448,6 +487,9 @@ const Workspace = () => {
           </div>
         </div>
       )}
+
+      {/* History Sidebar */}
+      <HistorySidebar open={showHistory} onOpenChange={setShowHistory} />
     </div>
   );
 };
