@@ -5,6 +5,8 @@ import { streamChat, type Msg } from "@/lib/stream-chat";
 import { parseExtensionFiles, analyzeManifest, getPermissionDescription, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
 import { createExtensionZip, downloadBlob } from "@/lib/zip-export";
 import { toast } from "sonner";
+import CodeBlock from "@/components/CodeBlock";
+import "@/styles/prism-brutal.css";
 
 const Workspace = () => {
   const location = useLocation();
@@ -208,9 +210,7 @@ const Workspace = () => {
                 })}
               </div>
               <div className="flex-1 overflow-auto p-5 bg-card">
-                <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-                  {activeFileContent}
-                </pre>
+                <CodeBlock code={activeFileContent} filename={activeFile} />
               </div>
               <div className="px-5 py-2 border-t-2 border-foreground bg-secondary/30 flex items-center justify-between">
                 <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest">
