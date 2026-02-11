@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle, User } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { TemplateGallery } from "@/components/TemplateGallery";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 const Index = () => {
   const [prompt, setPrompt] = useState("");
   const [session, setSession] = useState<Session | null>(null);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -101,22 +103,31 @@ const Index = () => {
               />
             </div>
 
-            {/* Template chips */}
-            <div className="flex items-center justify-center gap-3 mb-8">
-              {[
-                { label: "Dark Toggle", color: "bg-foreground text-background", hoverColor: "hover:bg-foreground/80" },
-                { label: "Price Tracker", color: "bg-accent-pink text-foreground", hoverColor: "hover:brightness-110" },
-                { label: "Tab Manager", color: "bg-accent-lime text-foreground", hoverColor: "hover:brightness-110" },
-              ].map((chip, i) => (
-                <button
-                  key={chip.label}
-                  onClick={() => fillPrompt(`Create a Chrome extension: ${chip.label.toLowerCase()}`)}
-                  className={`${chip.color} ${chip.hoverColor} px-4 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest border-2 border-foreground brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150 animate-fade-in`}
-                  style={{ animationDelay: `${600 + i * 80}ms` }}
-                >
-                  {chip.label}
-                </button>
-              ))}
+            {/* Template chips + Gallery button */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center justify-center gap-3">
+                {[
+                  { label: "Dark Toggle", color: "bg-foreground text-background", hoverColor: "hover:bg-foreground/80" },
+                  { label: "Price Tracker", color: "bg-accent-pink text-foreground", hoverColor: "hover:brightness-110" },
+                  { label: "Tab Manager", color: "bg-accent-lime text-foreground", hoverColor: "hover:brightness-110" },
+                ].map((chip, i) => (
+                  <button
+                    key={chip.label}
+                    onClick={() => fillPrompt(`Create a Chrome extension: ${chip.label.toLowerCase()}`)}
+                    className={`${chip.color} ${chip.hoverColor} px-4 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest border-2 border-foreground brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150 animate-fade-in`}
+                    style={{ animationDelay: `${600 + i * 80}ms` }}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowTemplateGallery(true)}
+                className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary hover:text-foreground transition-colors animate-fade-in"
+                style={{ animationDelay: "840ms" }}
+              >
+                Browse all templates →
+              </button>
             </div>
 
             <button
@@ -265,6 +276,12 @@ const Index = () => {
           </div>
         </div>
       </footer>
+      {/* Template Gallery Modal */}
+      <TemplateGallery 
+        isOpen={showTemplateGallery}
+        onClose={() => setShowTemplateGallery(false)}
+        onSelectTemplate={fillPrompt}
+      />
     </div>
   );
 };
