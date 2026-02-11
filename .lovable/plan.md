@@ -1,174 +1,118 @@
 
-# Extensio — Feature Roadmap Plan
 
-## Overview
-This plan covers the most impactful features to add, organized by priority tiers. Each tier builds on the previous one.
+# Rework: Landing-Centric Flow + History Sidebar + Code Typing Animation
 
----
-
-## Tier 1: Foundation (Persistence + Auth + History)
-These are blockers for scalability. Without them, every session is throwaway.
-
-### 1A. User Authentication
-- Add email/password signup and login using the built-in auth system
-- Create a minimal auth page at `/auth` with login/signup toggle
-- Protect the workspace route so generations are tied to a user
-- Add a user avatar/menu in the top bar with sign-out
-
-### 1B. Database Schema
-Create tables to persist user work:
-- **projects** — stores each generation session (id, user_id, name, created_at, updated_at)
-- **project_files** — stores generated files per project (id, project_id, filename, content)
-- **project_messages** — stores chat history (id, project_id, role, content, created_at)
-- RLS policies scoped to `auth.uid()` on all tables
-
-### 1C. Project History Dashboard
-- New `/dashboard` page showing a grid of past projects
-- Each card shows: project name (derived from first prompt), extension type badge, file count, last modified date
-- Click to reopen a project in the workspace and continue iterating
-- Delete projects with confirmation
+## Summary
+Three changes: (1) Make the landing page the hub -- prompt "Start Build" requires login, and after auth redirect back to landing, not dashboard. (2) Replace the dashboard with a slide-out history sidebar accessible from the landing page and workspace. (3) Add a typewriter animation to the code viewer so code appears character-by-character as it streams in.
 
 ---
 
-## Tier 2: UX Polish (Mobile + Dark Mode + Templates)
+## 1. Auth-Gated "Start Build" on Landing Page
 
-### 2A. Responsive Workspace
-- On screens below 768px, collapse to a single-pane view with tab navigation (Chat | Code | Status)
-- Use the existing `useIsMobile` hook
-- Swipeable panes or bottom tab bar
+**Current behavior:** Clicking "Start Build" navigates to `/workspace` regardless of auth state. A separate "Dashboard" button exists for logged-in users.
 
-### 2B. Dark Mode Toggle
-- Add a theme toggle button in the nav bar
-- Wire up the existing `next-themes` package (already installed)
-- Dark mode CSS variables are already defined in `index.css`
+**New behavior:**
+- When user clicks "Start Build" (or selects a template), check if they are logged in.
+- If NOT logged in, redirect to `/auth` with the prompt stored in the URL state (e.g., `navigate("/auth", { state: { redirectPrompt: prompt } })`).
+- After successful login/signup on `/auth`, redirect back to `/` with the prompt pre-filled, then auto-trigger navigation to `/workspace`.
+- The nav button changes from "Dashboard" to "History" (opens sidebar) when logged in.
 
-### 2C. Template Gallery
-- Expand the 3 landing page chips into a browsable modal/page with 10-15 categorized templates
-- Categories: Productivity, Social Media, Developer Tools, Shopping, Accessibility
-- Each template has a title, one-line description, and pre-filled prompt
-- Clicking a template navigates directly to workspace
+**Files changed:**
+- `src/pages/Index.tsx` -- gate `handleGenerate` behind auth check; change nav button from "Dashboard" to "History" toggle
+- `src/pages/Auth.tsx` -- accept `redirectPrompt` in location state; after auth, navigate to `/` with prompt in state instead of `/dashboard`
+- `src/App.tsx` -- remove `/dashboard` route; remove `Dashboard` import
 
----
+## 2. History Sidebar (Replaces Dashboard)
 
-## Tier 3: Intelligence (Clarification + Better Iterations)
+**New component:** `src/components/HistorySidebar.tsx`
 
-### 3A. Intent Clarification Screen
-- As outlined in the original plan: when the AI responds with a question instead of code, render it as a dedicated clarification UI (radio buttons or simple input) instead of raw chat text
-- Detect clarification responses by checking if the AI output contains no code blocks
-- Show a styled card with the question and chunky answer options
+A slide-out drawer/sheet from the right side containing the user's project history. Accessible from both the landing page nav and the workspace top bar.
 
-### 3B. Undo / Version History
-- Store each generation iteration as a version snapshot in the database
-- Add "Undo" and "Redo" buttons in the workspace toolbar
-- Show a version timeline in the status panel (v1, v2, v3...)
-- Click any version to restore that file state
+**Contents:**
+- Header: "Your Builds" with close button
+- List of projects ordered by `updated_at` desc
+- Each item shows: project name (truncated), extension type badge, time ago
+- Click a project to navigate to `/workspace` with `projectId` in state
+- Delete button per project with confirmation
+- Sign out button at the bottom
+- Uses the existing Sheet component from shadcn
 
-### 3C. Inline Code Editing
-- Make the code viewer editable (contenteditable or a lightweight editor)
-- Show a warning banner: "Manual edits may break validation"
-- Re-run validation on blur
-- Sync edits back to the files state so the ZIP reflects changes
+**Files changed:**
+- Create `src/components/HistorySidebar.tsx`
+- `src/pages/Index.tsx` -- add sidebar state + trigger button in nav
+- `src/pages/Workspace.tsx` -- replace "Dashboard" link with history sidebar trigger
+- Delete `src/pages/Dashboard.tsx`
 
----
+## 3. Code Typing Animation
 
-## Tier 4: Growth (Sharing + SEO + Docs)
+**Current behavior:** When code is generated, the full file content appears instantly in the `CodeBlock` component once files are parsed.
 
-### 4A. Shareable Build Links
-- Generate a unique URL for each project (e.g., `/build/abc123`)
-- Public read-only view showing the code and extension metadata
-- "Fork this build" button to clone into a new project
+**New behavior:** Code appears with a typewriter effect, characters revealed progressively.
 
-### 4B. SEO and Meta Tags
-- Add proper `<title>` and `<meta>` tags per page
-- OG image and description for social sharing
-- Sitemap for the landing page
+**Approach:**
+- Track a `displayedLength` state that increments via `requestAnimationFrame` or `setInterval`
+- Slice the actual code content to `displayedLength` and pass that to `CodeBlock`
+- When `activeFile` changes or content updates, reset and re-animate
+- Speed: ~20-30 characters per frame for a fast but visible "writing" effect
+- When generation is still streaming, the animation keeps pace; once done, it catches up quickly
 
-### 4C. Docs, Privacy, Terms Pages
-- Create simple static pages at `/docs`, `/privacy`, `/terms`
-- Wire up the dead footer links
-- Docs page: quick-start guide, FAQ, supported extension types
-
-### 4D. Usage Dashboard
-- Show remaining credits / rate limit status in the workspace top bar
-- Proactive warning when approaching limits instead of only error toasts
+**Files changed:**
+- `src/pages/Workspace.tsx` -- add typing animation state around the `CodeBlock` render in the center pane
 
 ---
 
 ## Technical Details
 
-### Database Migration SQL (Tier 1B)
+### Auth Flow with Redirect
+
 ```text
--- projects table
-CREATE TABLE public.projects (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
-  name TEXT NOT NULL DEFAULT 'Untitled Extension',
-  extension_type TEXT DEFAULT 'unknown',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- project_files table  
-CREATE TABLE public.project_files (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
-  filename TEXT NOT NULL,
-  content TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- project_messages table
-CREATE TABLE public.project_messages (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-  content TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- RLS policies (all scoped to auth.uid())
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.project_files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.project_messages ENABLE ROW LEVEL SECURITY;
-
--- Users can only access their own projects
-CREATE POLICY "users_own_projects" ON public.projects
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_files" ON public.project_files
-  FOR ALL USING (project_id IN (
-    SELECT id FROM public.projects WHERE user_id = auth.uid()
-  ));
-
-CREATE POLICY "users_own_messages" ON public.project_messages
-  FOR ALL USING (project_id IN (
-    SELECT id FROM public.projects WHERE user_id = auth.uid()
-  ));
+User types prompt -> clicks "Start Build"
+  |
+  v
+Logged in? --YES--> navigate("/workspace", { state: { prompt } })
+  |
+  NO
+  v
+navigate("/auth", { state: { redirectPrompt: prompt } })
+  |
+  v
+User logs in / signs up
+  |
+  v
+Auth.tsx detects session -> navigate("/", { state: { prompt: redirectPrompt } })
+  |
+  v
+Index.tsx picks up prompt from state -> auto-navigates to workspace
 ```
 
-### New Routes
+### History Sidebar Structure
+
+Uses the existing `Sheet` component (from `@/components/ui/sheet`):
+- `SheetTrigger` in the nav bar
+- `SheetContent` side="right" containing project list
+- Fetches projects from `supabase.from("projects")` on open
+- Each project card is clickable, navigates to workspace
+
+### Typing Animation Logic
+
 ```text
-/auth         — Login/Signup page
-/dashboard    — Project history grid
-/workspace    — Generation workspace (existing)
-/build/:id    — Shareable read-only view (Tier 4)
-/docs         — Documentation
-/privacy      — Privacy policy
-/terms        — Terms of service
+- State: visibleChars (number), starts at 0
+- On activeFileContent change: reset visibleChars to 0
+- useEffect with setInterval (every 16ms, add ~20 chars)
+- displayedCode = activeFileContent.slice(0, visibleChars)
+- Pass displayedCode to CodeBlock
+- When visibleChars >= content.length, clear interval
+- Skip animation for user-initiated file tab switches on already-loaded projects
 ```
 
-### Files to Create/Modify
-- `src/pages/Auth.tsx` — Authentication page
-- `src/pages/Dashboard.tsx` — Project history
-- `src/pages/Workspace.tsx` — Add save/load logic, undo, mobile layout
-- `src/components/ThemeToggle.tsx` — Dark mode switch
-- `src/components/TemplateGallery.tsx` — Browsable template modal
-- `src/components/MobileWorkspace.tsx` — Single-pane mobile layout
-- `src/App.tsx` — Add new routes and auth guards
+### Files Summary
 
-### Suggested Implementation Order
-1. Auth + Database + History (Tier 1) — unlocks persistence
-2. Dark mode + Mobile responsive (Tier 2A-B) — quick wins
-3. Templates + Clarification UI (Tier 2C + 3A) — better UX
-4. Undo/Versioning + Code editing (Tier 3B-C) — power features
-5. Sharing + SEO + Docs (Tier 4) — growth features
+| Action | File |
+|--------|------|
+| Create | `src/components/HistorySidebar.tsx` |
+| Modify | `src/pages/Index.tsx` |
+| Modify | `src/pages/Auth.tsx` |
+| Modify | `src/pages/Workspace.tsx` |
+| Modify | `src/App.tsx` |
+| Delete | `src/pages/Dashboard.tsx` |
+
