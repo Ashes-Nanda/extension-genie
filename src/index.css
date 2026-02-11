@@ -168,4 +168,7 @@
   .bg-accent-purple { background-color: hsl(var(--accent-purple)); }
   .text-accent-pink { color: hsl(var(--accent-pink)); }
   .text-accent-lime { color: hsl(var(--accent-lime)); }
+  .text-accent-orange { color: hsl(var(--accent-orange)); }
+  .text-accent-yellow { color: hsl(var(--accent-yellow)); }
+  .text-accent-purple { color: hsl(var(--accent-purple)); }
 }
