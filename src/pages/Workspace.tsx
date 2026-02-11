@@ -158,6 +158,30 @@ const Workspace = () => {
   };
 
   const [isGeneratingIcons, setIsGeneratingIcons] = useState(false);
+  const [previewIcon, setPreviewIcon] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+
+  const generatePreviewIcon = async () => {
+    if (!files.length) return;
+    try {
+      setIsGeneratingPreview(true);
+      const manifestFile = files.find((f) => f.name === "manifest.json");
+      if (!manifestFile) return;
+      
+      const icons = await generateIcons(manifestFile.content);
+      const iconBlob = icons["icon128.png"];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewIcon(reader.result as string);
+      };
+      reader.readAsDataURL(iconBlob);
+    } catch (err) {
+      console.warn("Preview generation failed:", err);
+      toast.warning("Couldn't preview icon");
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
 
   const handleDownload = async () => {
     if (files.length === 0) return;
@@ -457,7 +481,44 @@ const Workspace = () => {
             )}
           </div>
 
-          {/* Download */}
+           {/* Icon Preview */}
+           {files.length > 0 && (
+             <div className="p-4 border-b-2 border-foreground">
+               <h4 className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-3 font-bold flex items-center gap-1.5">
+                 <FileCode className="h-3 w-3" /> Icon Preview
+               </h4>
+               {previewIcon ? (
+                 <div className="flex flex-col items-center gap-3">
+                   <img
+                     src={previewIcon}
+                     alt="Extension icon preview"
+                     className="w-24 h-24 border-2 border-foreground bg-secondary p-2 image-pixelated"
+                   />
+                   <button
+                     onClick={generatePreviewIcon}
+                     disabled={isGeneratingPreview}
+                     className="brutal-button bg-secondary text-foreground px-3 py-1.5 text-[10px] w-full disabled:opacity-40"
+                   >
+                     {isGeneratingPreview ? "Regenerating..." : "Regenerate"}
+                   </button>
+                 </div>
+               ) : (
+                 <button
+                   onClick={generatePreviewIcon}
+                   disabled={isGeneratingPreview || !files.length}
+                   className="brutal-button bg-secondary text-foreground px-3 py-2 text-[10px] w-full disabled:opacity-40"
+                 >
+                   {isGeneratingPreview ? (
+                     <><Loader2 className="inline h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
+                   ) : (
+                     "Preview Icon"
+                   )}
+                 </button>
+               )}
+             </div>
+           )}
+
+           {/* Download */}
           <div className="p-4 mt-auto">
             <button
               onClick={handleDownload}
