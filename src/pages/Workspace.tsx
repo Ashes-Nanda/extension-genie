@@ -15,7 +15,7 @@ const Workspace = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState<ExtensionFile[]>([]);
-  const [meta, setMeta] = useState<ExtensionMeta>({ type: "unknown", permissions: [], warnings: [] });
+  const [meta, setMeta] = useState<ExtensionMeta>({ type: "unknown", permissions: [], warnings: [], issues: [] });
   const [activeFile, setActiveFile] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -89,7 +89,10 @@ const Workspace = () => {
   };
 
   const activeFileContent = files.find((f) => f.name === activeFile)?.content || "";
-  const hasErrors = meta.warnings.length > 0;
+  const errors = meta.issues.filter((i) => i.level === "error");
+  const warnings = meta.issues.filter((i) => i.level === "warning");
+  const infos = meta.issues.filter((i) => i.level === "info");
+  const hasErrors = errors.length > 0;
   const isReady = files.length > 0 && !hasErrors;
 
   return (
@@ -227,24 +230,37 @@ const Workspace = () => {
             <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Validation</h4>
             {files.length === 0 ? (
               <p className="text-xs text-muted-foreground">Waiting for generation…</p>
-            ) : hasErrors ? (
+            ) : (
               <div className="space-y-2">
-                {meta.warnings.map((w, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs text-destructive">
-                    <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {w}
+                {errors.map((issue, i) => (
+                  <div key={`e-${i}`} className="flex items-start gap-2 text-xs text-destructive">
+                    <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {issue.message}
                   </div>
                 ))}
-                <button
-                  onClick={() => sendMessage("Fix the following validation errors: " + meta.warnings.join(", "))}
-                  disabled={isLoading}
-                  className="brutal-button bg-destructive text-destructive-foreground px-3 py-1.5 text-xs mt-2 w-full disabled:opacity-40"
-                >
-                  Fix Automatically
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs text-primary font-bold">
-                <CheckCircle className="h-4 w-4" /> Ready to install
+                {warnings.map((issue, i) => (
+                  <div key={`w-${i}`} className="flex items-start gap-2 text-xs text-accent-orange">
+                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {issue.message}
+                  </div>
+                ))}
+                {infos.map((issue, i) => (
+                  <div key={`i-${i}`} className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <FileCode className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> {issue.message}
+                  </div>
+                ))}
+                {hasErrors && (
+                  <button
+                    onClick={() => sendMessage("Fix the following validation errors: " + errors.map(e => e.message).join(", "))}
+                    disabled={isLoading}
+                    className="brutal-button bg-destructive text-destructive-foreground px-3 py-1.5 text-xs mt-2 w-full disabled:opacity-40"
+                  >
+                    Fix Automatically
+                  </button>
+                )}
+                {!hasErrors && (
+                  <div className="flex items-center gap-2 text-xs text-primary font-bold">
+                    <CheckCircle className="h-4 w-4" /> Ready to install
+                  </div>
+                )}
               </div>
             )}
           </div>
