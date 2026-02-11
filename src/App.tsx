@@ -9,7 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import Index from "./pages/Index";
 import Workspace from "./pages/Workspace";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,14 +48,6 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute session={session}>
             <Workspace />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute session={session}>
-            <Dashboard />
           </ProtectedRoute>
         }
       />

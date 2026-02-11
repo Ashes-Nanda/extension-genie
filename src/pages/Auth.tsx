@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Layers, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -10,20 +10,32 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectPrompt = (location.state as any)?.redirectPrompt || "";
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate("/dashboard");
+        if (redirectPrompt) {
+          navigate("/", { state: { prompt: redirectPrompt } });
+        } else {
+          navigate("/");
+        }
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/dashboard");
+      if (session) {
+        if (redirectPrompt) {
+          navigate("/", { state: { prompt: redirectPrompt } });
+        } else {
+          navigate("/");
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, redirectPrompt]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +54,7 @@ const Auth = () => {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Check your email to confirm your account!");
+        toast.success("Account created! Logging you in...");
       }
     } catch (err: any) {
       toast.error(err.message || "Authentication failed");
@@ -66,6 +78,13 @@ const Auth = () => {
       {/* Auth Form */}
       <div className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-md">
+          {redirectPrompt && (
+            <div className="mb-6 p-3 border-2 border-foreground bg-accent-yellow/20 brutal-shadow-sm">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Your prompt is saved</p>
+              <p className="font-mono text-xs truncate">{redirectPrompt}</p>
+            </div>
+          )}
+
           {/* Toggle */}
           <div className="flex mb-8">
             {["Login", "Sign Up"].map((label, i) => {
