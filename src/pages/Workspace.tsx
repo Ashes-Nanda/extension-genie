@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Send, Download, CheckCircle, XCircle, AlertTriangle, FileCode, Loader2, Layers, Shield, Zap, LogOut, History } from "lucide-react";
 import { streamChat, type Msg } from "@/lib/stream-chat";
 import { parseExtensionFiles, analyzeManifest, getPermissionDescription, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
-import { createExtensionZip, downloadBlob } from "@/lib/zip-export";
+import { createExtensionZip, createExtensionZipWithIcons, downloadBlob } from "@/lib/zip-export";
+import { generateIcons } from "@/lib/icon-generator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CodeBlock from "@/components/CodeBlock";
@@ -156,14 +157,32 @@ const Workspace = () => {
     }
   };
 
+  const [isGeneratingIcons, setIsGeneratingIcons] = useState(false);
+
   const handleDownload = async () => {
     if (files.length === 0) return;
     try {
-      const blob = await createExtensionZip(files);
+      setIsGeneratingIcons(true);
+      const manifestFile = files.find((f) => f.name === "manifest.json");
+      let blob: Blob;
+      try {
+        if (manifestFile) {
+          const icons = await generateIcons(manifestFile.content);
+          blob = await createExtensionZipWithIcons(files, icons);
+        } else {
+          blob = await createExtensionZip(files);
+        }
+      } catch (iconErr) {
+        console.warn("Icon generation failed, falling back:", iconErr);
+        toast.warning("Icons couldn't be generated — downloading without icons");
+        blob = await createExtensionZip(files);
+      }
       downloadBlob(blob, "extension.zip");
       setShowSuccess(true);
     } catch {
       toast.error("Failed to create ZIP");
+    } finally {
+      setIsGeneratingIcons(false);
     }
   };
 
@@ -442,10 +461,14 @@ const Workspace = () => {
           <div className="p-4 mt-auto">
             <button
               onClick={handleDownload}
-              disabled={files.length === 0}
+              disabled={files.length === 0 || isGeneratingIcons}
               className="brutal-button bg-foreground text-background px-4 py-3.5 text-xs w-full disabled:opacity-30 flex items-center justify-center gap-2"
             >
-              <Download className="h-4 w-4" /> Download ZIP
+              {isGeneratingIcons ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Generating Icons…</>
+              ) : (
+                <><Download className="h-4 w-4" /> Download ZIP</>
+              )}
             </button>
             {isReady && (
               <p className="font-mono text-[9px] text-center text-muted-foreground mt-2 uppercase tracking-widest">
