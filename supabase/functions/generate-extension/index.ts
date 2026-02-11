@@ -17,7 +17,7 @@ CRITICAL RULES:
 6. Use chrome.scripting.executeScript instead of chrome.tabs.executeScript
 7. Permissions must be minimal — only what's needed
 8. Every file referenced in manifest.json MUST be generated
-9. NEVER reference icon files (icon.png, icon16.png, etc.) in manifest.json "icons" field. You cannot generate binary image files. Simply OMIT the "icons" field entirely from manifest.json. Do NOT include any "icons" key.
+9. Do NOT include an "icons" field in manifest.json — icons will be auto-generated separately after code generation. Simply OMIT the "icons" key entirely.
 10. NEVER use eval(), new Function(), or any dynamic code execution
 11. NEVER load remote scripts via <script src="https://..."> or fetch+eval patterns
 12. NEVER include obfuscated code, base64-encoded scripts, or minified blobs
