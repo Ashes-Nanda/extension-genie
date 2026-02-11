@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, ArrowRight, ArrowLeft, Check, CreditCard, Shield, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface CheckoutFlowProps {
   planName: string;
@@ -47,10 +48,22 @@ export const CheckoutFlow = ({ planName, planPrice, onClose }: CheckoutFlowProps
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-foreground/60" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-foreground/60"
+        onClick={onClose}
+      />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg bg-background border-2 border-foreground brutal-shadow animate-scale-in">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        className="relative w-full max-w-lg bg-background border-2 border-foreground brutal-shadow"
+      >
         {/* Close */}
         <button
           onClick={onClose}
@@ -92,9 +105,17 @@ export const CheckoutFlow = ({ planName, planPrice, onClose }: CheckoutFlowProps
 
         {/* Content */}
         <div className="px-8 pb-8">
-          {/* Step 1: Plan Summary */}
-          {step === "plan" && (
-            <div className="space-y-6">
+          <AnimatePresence mode="wait">
+            {/* Step 1: Plan Summary */}
+            {step === "plan" && (
+              <motion.div
+                key="plan"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
               <h3 className="font-display text-2xl font-bold italic uppercase">Your Plan</h3>
               <div className="brutal-card p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -115,12 +136,19 @@ export const CheckoutFlow = ({ planName, planPrice, onClose }: CheckoutFlowProps
               >
                 Continue to Billing <ArrowRight className="h-3 w-3" />
               </button>
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Step 2: Billing */}
-          {step === "billing" && (
-            <div className="space-y-6">
+            {/* Step 2: Billing */}
+            {step === "billing" && (
+              <motion.div
+                key="billing"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
               <h3 className="font-display text-2xl font-bold italic uppercase">Billing Details</h3>
 
               <div className="space-y-4">
@@ -195,12 +223,19 @@ export const CheckoutFlow = ({ planName, planPrice, onClose }: CheckoutFlowProps
                   Review Order <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Step 3: Confirm */}
-          {step === "confirm" && (
-            <div className="space-y-6">
+            {/* Step 3: Confirm */}
+            {step === "confirm" && (
+              <motion.div
+                key="confirm"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
               <h3 className="font-display text-2xl font-bold italic uppercase">Confirm Order</h3>
 
               <div className="brutal-card p-6 space-y-4">
@@ -250,29 +285,66 @@ export const CheckoutFlow = ({ planName, planPrice, onClose }: CheckoutFlowProps
                   )}
                 </button>
               </div>
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Step 4: Success */}
-          {step === "success" && (
-            <div className="text-center space-y-6 py-4">
-              <div className="w-16 h-16 bg-accent-lime border-2 border-foreground flex items-center justify-center mx-auto brutal-shadow">
-                <Check className="h-8 w-8 text-foreground" />
-              </div>
-              <h3 className="font-display text-2xl font-bold italic uppercase">You're In!</h3>
-              <p className="font-mono text-xs text-muted-foreground max-w-xs mx-auto">
-                Welcome to {planName}. Your account has been upgraded. Start building unlimited extensions now.
-              </p>
-              <button
-                onClick={onClose}
-                className="brutal-button bg-foreground text-background px-8 py-3 text-xs"
+            {/* Step 4: Success */}
+            {step === "success" && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.3 }}
+                className="text-center space-y-6 py-4"
               >
-                Start Building <ArrowRight className="h-3 w-3 inline ml-1" />
-              </button>
-            </div>
-          )}
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", damping: 15, stiffness: 200 }}
+                  className="w-16 h-16 bg-accent-lime border-2 border-foreground flex items-center justify-center mx-auto brutal-shadow"
+                >
+                  <motion.div
+                    initial={{ rotate: -180, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    transition={{ delay: 0.2, duration: 0.4 }}
+                  >
+                    <Check className="h-8 w-8 text-foreground" />
+                  </motion.div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <h3 className="font-display text-2xl font-bold italic uppercase">You're In!</h3>
+                </motion.div>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="font-mono text-xs text-muted-foreground max-w-xs mx-auto"
+                >
+                  Welcome to {planName}. Your account has been upgraded. Start building unlimited extensions now.
+                </motion.p>
+
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  whileHover={{ translateY: -2 }}
+                  onClick={onClose}
+                  className="brutal-button bg-foreground text-background px-8 py-3 text-xs"
+                >
+                  Start Building <ArrowRight className="h-3 w-3 inline ml-1" />
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

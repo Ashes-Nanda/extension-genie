@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layers, Check, ArrowRight, Zap, Crown, Building2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CheckoutFlow } from "@/components/checkout/CheckoutFlow";
 
@@ -109,44 +110,77 @@ const Pricing = () => {
         <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-6">
           {plans.map((plan, i) => (
             <ScrollReveal key={plan.name} animation="fade-in" delay={i * 120}>
-              <div
+              <motion.div
+                whileHover={{ y: -4 }}
+                transition={{ type: "spring", damping: 20, stiffness: 300 }}
                 className={`${plan.color} border-2 border-foreground p-8 brutal-shadow relative group cursor-default transition-all duration-200 hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[1px_1px_0px_0px_hsl(0_0%_0%)] flex flex-col h-full`}
               >
                 {plan.popular && (
-                  <div className="absolute -top-3 left-6 bg-primary text-primary-foreground px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest border-2 border-foreground">
+                  <motion.div
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.12 + 0.3 }}
+                    className="absolute -top-3 left-6 bg-primary text-primary-foreground px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest border-2 border-foreground"
+                  >
                     Most Popular
-                  </div>
+                  </motion.div>
                 )}
 
-                <div className="w-10 h-10 bg-foreground flex items-center justify-center mb-4">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: i * 0.12 + 0.1, type: "spring", damping: 15 }}
+                  className="w-10 h-10 bg-foreground flex items-center justify-center mb-4"
+                >
                   <plan.icon className="h-5 w-5 text-background" />
-                </div>
+                </motion.div>
 
                 <h3 className="font-display text-2xl font-bold italic uppercase mb-2">{plan.name}</h3>
 
-                <div className="mb-6">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.12 + 0.2 }}
+                  className="mb-6"
+                >
                   <span className="font-display text-4xl font-bold italic">{plan.price}</span>
                   {plan.period && (
                     <span className="font-mono text-xs text-muted-foreground ml-1">{plan.period}</span>
                   )}
-                </div>
+                </motion.div>
 
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 font-mono text-xs">
+                <motion.ul
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.12 + 0.25, staggerChildren: 0.05 }}
+                  className="space-y-3 mb-8 flex-1"
+                >
+                  {plan.features.map((f, fidx) => (
+                    <motion.li
+                      key={f}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.12 + 0.25 + fidx * 0.05 }}
+                      className="flex items-start gap-2 font-mono text-xs"
+                    >
                       <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                       <span>{f}</span>
-                    </li>
+                    </motion.li>
                   ))}
-                </ul>
+                </motion.ul>
 
-                <button
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.12 + 0.4 }}
+                  whileHover={{ translateY: -2, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => handleSelectPlan(plan.name)}
                   className="brutal-button bg-foreground text-background w-full py-3 text-xs flex items-center justify-center gap-2"
                 >
                   {plan.cta} <ArrowRight className="h-3 w-3" />
-                </button>
-              </div>
+                </motion.button>
+              </motion.div>
             </ScrollReveal>
           ))}
         </div>
