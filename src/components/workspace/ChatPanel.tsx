@@ -26,13 +26,13 @@ export const ChatPanel = ({ messages, input, onInputChange, onSend, isLoading }:
   };
 
   return (
-    <div className="w-[360px] flex-shrink-0 flex flex-col border-r-2 border-foreground bg-background min-h-0
-                     max-md:w-full max-md:border-r-0 max-md:border-b-2">
+    <div className="w-[360px] flex-shrink-0 flex flex-col border-r-2 border-foreground bg-background min-h-0 h-full overflow-hidden
+                     max-md:w-full max-md:border-r-0 max-md:border-b-2 max-md:h-auto max-md:max-h-[50vh]">
       <div className="px-4 py-3 border-b-2 border-foreground bg-accent-pink/20">
         <h3 className="font-display text-xs uppercase tracking-widest">Prompt Chat</h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-md:max-h-[40vh]">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-12 animate-fade-in">
             <div className="w-10 h-10 border-2 border-foreground/15 bg-accent-lime/10 flex items-center justify-center mb-3 rotate-[-3deg]">

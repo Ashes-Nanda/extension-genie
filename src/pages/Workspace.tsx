@@ -297,7 +297,7 @@ const Workspace = () => {
       {/* 3-pane layout — desktop: side-by-side, mobile: tab-switched */}
       <div className="flex-1 flex overflow-hidden min-h-0 max-md:flex-col">
         {/* Chat panel */}
-        <div className={`md:flex flex-col ${mobilePanel === "chat" ? "flex" : "hidden md:flex"}`}>
+        <div className={`md:flex flex-col min-h-0 ${mobilePanel === "chat" ? "flex" : "hidden md:flex"}`}>
           <ChatPanel
             messages={messages}
             input={input}
@@ -308,7 +308,7 @@ const Workspace = () => {
         </div>
 
         {/* Code panel */}
-        <div className={`flex-1 flex-col overflow-hidden ${mobilePanel === "code" ? "flex" : "hidden md:flex"}`}>
+        <div className={`flex-1 flex-col overflow-hidden min-h-0 ${mobilePanel === "code" ? "flex" : "hidden md:flex"}`}>
           {files.length > 0 ? (
             <CodeViewer
               files={files}
@@ -325,7 +325,7 @@ const Workspace = () => {
         </div>
 
         {/* Status panel */}
-        <div className={`md:flex flex-col ${mobilePanel === "status" ? "flex" : "hidden md:flex"}`}>
+        <div className={`md:flex flex-col min-h-0 ${mobilePanel === "status" ? "flex" : "hidden md:flex"}`}>
           <StatusPanel
             meta={meta}
             files={files}
