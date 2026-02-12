@@ -295,7 +295,7 @@ const Workspace = () => {
       </div>
 
       {/* 3-pane layout — desktop: side-by-side, mobile: tab-switched */}
-      <div className="flex-1 flex overflow-hidden max-md:flex-col">
+      <div className="flex-1 flex overflow-hidden min-h-0 max-md:flex-col">
         {/* Chat panel */}
         <div className={`md:flex flex-col ${mobilePanel === "chat" ? "flex" : "hidden md:flex"}`}>
           <ChatPanel
