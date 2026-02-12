@@ -18,11 +18,15 @@ export const ChatPanel = ({ messages, input, onInputChange, onSend, isLoading }:
   }, [messages]);
 
   const formatContent = (content: string) => {
-    return content.replace(/```[\s\S]*?```/g, "✦ code generated →");
+    // Remove all code blocks (fenced and inline) — chat pane is conversation-only
+    let cleaned = content.replace(/```[\s\S]*?```/g, "✦ code generated →");
+    // Also strip any remaining file-like blocks that leak through
+    cleaned = cleaned.replace(/`[^`]+`/g, (match) => match.length > 60 ? "✦ snippet →" : match);
+    return cleaned.trim();
   };
 
   return (
-    <div className="w-[360px] flex-shrink-0 flex flex-col border-r-2 border-foreground bg-background
+    <div className="w-[360px] flex-shrink-0 flex flex-col border-r-2 border-foreground bg-background min-h-0
                      max-md:w-full max-md:border-r-0 max-md:border-b-2">
       <div className="px-4 py-3 border-b-2 border-foreground bg-accent-pink/20">
         <h3 className="font-display text-xs uppercase tracking-widest">Prompt Chat</h3>
