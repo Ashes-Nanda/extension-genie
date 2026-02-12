@@ -63,8 +63,8 @@ export const StatusPanel = ({
   onFixErrors, onDownload, onGeneratePreviewIcon,
 }: StatusPanelProps) => {
   return (
-    <div className="w-[290px] flex-shrink-0 border-l-2 border-foreground flex flex-col overflow-y-auto bg-background
-                     max-md:w-full max-md:border-l-0 max-md:border-t-2">
+    <div className="w-[290px] flex-shrink-0 border-l-2 border-foreground flex flex-col overflow-y-auto bg-background min-h-0 h-full
+                     max-md:w-full max-md:border-l-0 max-md:border-t-2 max-md:h-auto">
       {/* Extension Type */}
       <div className="p-4 border-b-2 border-foreground">
         <h4 className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-3 font-bold flex items-center gap-1.5">
