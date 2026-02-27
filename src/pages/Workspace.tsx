@@ -5,7 +5,7 @@ import { streamChat, type Msg } from "@/lib/stream-chat";
 import { parseExtensionFiles, analyzeManifest, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
 import { createExtensionZip, createExtensionZipWithIcons, downloadBlob } from "@/lib/zip-export";
 import { generateIcons } from "@/lib/icon-generator";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { HistorySidebar } from "@/components/HistorySidebar";
 import { ChatPanel } from "@/components/workspace/ChatPanel";
@@ -29,7 +29,7 @@ const Workspace = () => {
   const [meta, setMeta] = useState<ExtensionMeta>({ type: "unknown", permissions: [], warnings: [], issues: [] });
   const [activeFile, setActiveFile] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
-  const [projectId, setProjectId] = useState<string | null>(loadProjectId);
+  // const [projectId, setProjectId] = useState<string | null>(loadProjectId);
   const fullResponseRef = useRef("");
 
   // Mobile panel toggle
@@ -44,65 +44,12 @@ const Workspace = () => {
   const [visibleChars, setVisibleChars] = useState(0);
   const isNewGeneration = useRef(false);
 
-  // Load existing project
+  // Load initial prompt
   useEffect(() => {
-    if (loadProjectId) {
-      loadProject(loadProjectId);
-    } else if (initialPrompt && messages.length === 0) {
+    if (initialPrompt && messages.length === 0) {
       sendMessage(initialPrompt);
     }
   }, []);
-
-  const loadProject = async (id: string) => {
-    const [{ data: msgData }, { data: fileData }] = await Promise.all([
-      supabase.from("project_messages").select("role, content").eq("project_id", id).order("created_at"),
-      supabase.from("project_files").select("filename, content").eq("project_id", id),
-    ]);
-    if (msgData) {
-      setMessages(msgData.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
-    }
-    if (fileData && fileData.length > 0) {
-      const parsed = fileData.map((f) => ({ name: f.filename, content: f.content }));
-      setFiles(parsed);
-      setMeta(analyzeManifest(parsed));
-      setActiveFile(parsed[0]?.name || "");
-    }
-  };
-
-  const saveProject = async (msgs: Msg[], parsedFiles: ExtensionFile[], extMeta: ExtensionMeta) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const projectName = msgs.find((m) => m.role === "user")?.content.slice(0, 80) || "Untitled Extension";
-
-    if (!projectId) {
-      const { data, error } = await supabase
-        .from("projects")
-        .insert({ user_id: user.id, name: projectName, extension_type: extMeta.type })
-        .select("id")
-        .single();
-      if (error || !data) return;
-      setProjectId(data.id);
-      await saveProjectData(data.id, msgs, parsedFiles);
-    } else {
-      await supabase.from("projects").update({ extension_type: extMeta.type, updated_at: new Date().toISOString() }).eq("id", projectId);
-      await saveProjectData(projectId, msgs, parsedFiles);
-    }
-  };
-
-  const saveProjectData = async (pid: string, msgs: Msg[], parsedFiles: ExtensionFile[]) => {
-    await supabase.from("project_messages").delete().eq("project_id", pid);
-    await supabase.from("project_files").delete().eq("project_id", pid);
-    if (msgs.length > 0) {
-      await supabase.from("project_messages").insert(
-        msgs.map((m) => ({ project_id: pid, role: m.role, content: m.content }))
-      );
-    }
-    if (parsedFiles.length > 0) {
-      await supabase.from("project_files").insert(
-        parsedFiles.map((f) => ({ project_id: pid, filename: f.name, content: f.content }))
-      );
-    }
-  };
 
   const processResponse = (fullText: string) => {
     const parsed = parseExtensionFiles(fullText);
@@ -149,7 +96,6 @@ const Workspace = () => {
               setActiveFile(parsed[0]?.name || "");
             }
             const allMsgs = [...allMessages, { role: "assistant" as const, content: fullResponseRef.current }];
-            saveProject(allMsgs, parsed, newMeta);
             // Switch to code view on mobile after generation
             setMobilePanel("code");
           } else {
@@ -286,7 +232,7 @@ const Workspace = () => {
             </span>
           )}
           <button
-            onClick={async () => { await supabase.auth.signOut(); navigate("/"); }}
+            onClick={() => navigate("/")}
             className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
           >
             <LogOut className="h-3.5 w-3.5" />
