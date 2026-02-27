@@ -1,45 +1,18 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle, User, History } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Shield, Zap, Lock, Code, Eye, Package, Layers, Terminal, Puzzle, CheckCircle, History } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { TemplateGallery } from "@/components/TemplateGallery";
 import { HistorySidebar } from "@/components/HistorySidebar";
-import { supabase } from "@/integrations/supabase/client";
-import type { Session } from "@supabase/supabase-js";
+
 const Index = () => {
   const [prompt, setPrompt] = useState("");
-  const [session, setSession] = useState<Session | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Pick up prompt from auth redirect
-  useEffect(() => {
-    const state = location.state as any;
-    if (state?.prompt) {
-      setPrompt(state.prompt);
-      // Clear state so it doesn't re-trigger
-      window.history.replaceState({}, document.title);
-      // Auto-navigate to workspace if logged in
-      if (session) {
-        navigate("/workspace", { state: { prompt: state.prompt } });
-      }
-    }
-  }, [location.state, session]);
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
-    if (!session) {
-      navigate("/auth", { state: { redirectPrompt: prompt.trim() } });
-      return;
-    }
     navigate("/workspace", { state: { prompt: prompt.trim() } });
   };
 
@@ -69,21 +42,12 @@ const Index = () => {
             <a href="#safety" className="hover:text-primary transition-colors">Safety</a>
             <button onClick={() => navigate("/pricing")} className="hover:text-primary transition-colors">PRICING</button>
           </div>
-          {session ? (
-            <button
-              onClick={() => setShowHistory(true)}
-              className="brutal-button bg-accent-lime text-foreground px-4 py-1.5 text-[10px] flex items-center gap-1.5"
-            >
-              <History className="h-3 w-3" /> History
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate("/auth")}
-              className="brutal-button bg-foreground text-background px-4 py-1.5 text-[10px] flex items-center gap-1.5"
-            >
-              <User className="h-3 w-3" /> Login
-            </button>
-          )}
+          <button
+            onClick={() => setShowHistory(true)}
+            className="brutal-button bg-accent-lime text-foreground px-4 py-1.5 text-[10px] flex items-center gap-1.5"
+          >
+            <History className="h-3 w-3" /> History
+          </button>
         </div>
       </nav>
 
