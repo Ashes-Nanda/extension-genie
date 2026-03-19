@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, CheckCircle, XCircle, AlertTriangle, FileCode, Loader2, Shield, Zap, ChevronDown, Image } from "lucide-react";
+import { Download, CheckCircle, XCircle, AlertTriangle, FileCode, Loader2, Shield, Zap, ChevronDown } from "lucide-react";
 import type { ExtensionMeta } from "@/lib/extension-parser";
 import { getPermissionDescription } from "@/lib/extension-parser";
 
@@ -12,12 +12,8 @@ interface StatusPanelProps {
   warningsList: { message: string; level: string }[];
   infos: { message: string; level: string }[];
   isLoading: boolean;
-  isGeneratingIcons: boolean;
-  isGeneratingPreview: boolean;
-  previewIcon: string | null;
   onFixErrors: () => void;
   onDownload: () => void;
-  onGeneratePreviewIcon: () => void;
 }
 
 const typeColorMap: Record<string, string> = {
@@ -59,8 +55,8 @@ const CollapsibleSection = ({
 export const StatusPanel = ({
   meta, files, hasErrors, isReady,
   errors, warningsList, infos,
-  isLoading, isGeneratingIcons, isGeneratingPreview, previewIcon,
-  onFixErrors, onDownload, onGeneratePreviewIcon,
+  isLoading,
+  onFixErrors, onDownload,
 }: StatusPanelProps) => {
   return (
     <div className="w-[290px] flex-shrink-0 border-l-2 border-foreground flex flex-col overflow-y-auto bg-background min-h-0 h-full
@@ -137,59 +133,14 @@ export const StatusPanel = ({
         )}
       </CollapsibleSection>
 
-      {/* Icon Preview */}
-      {files.length > 0 && (
-        <CollapsibleSection title="Icon Preview" icon={Image} defaultOpen={!!previewIcon}>
-          {previewIcon ? (
-            <div className="flex flex-col items-center gap-3">
-              <div className="border-2 border-foreground bg-secondary/30 p-3 brutal-shadow-sm">
-                <img
-                  src={previewIcon}
-                  alt="Extension icon preview"
-                  className="w-20 h-20"
-                  style={{ imageRendering: "auto" }}
-                />
-              </div>
-              <button
-                onClick={onGeneratePreviewIcon}
-                disabled={isGeneratingPreview}
-                className="brutal-button bg-secondary text-foreground px-3 py-1.5 text-[10px] w-full disabled:opacity-40"
-              >
-                {isGeneratingPreview ? (
-                  <><Loader2 className="inline h-3 w-3 mr-1.5 animate-spin" /> Regenerating…</>
-                ) : (
-                  "↻ Regenerate"
-                )}
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={onGeneratePreviewIcon}
-              disabled={isGeneratingPreview || !files.length}
-              className="brutal-button bg-accent-purple/20 text-foreground px-3 py-2.5 text-[10px] w-full disabled:opacity-40 flex items-center justify-center gap-1.5"
-            >
-              {isGeneratingPreview ? (
-                <><Loader2 className="inline h-3 w-3 animate-spin" /> Generating…</>
-              ) : (
-                <><Image className="h-3 w-3" /> Generate Icon Preview</>
-              )}
-            </button>
-          )}
-        </CollapsibleSection>
-      )}
-
       {/* Download */}
       <div className="p-4 mt-auto">
         <button
           onClick={onDownload}
-          disabled={files.length === 0 || isGeneratingIcons}
+          disabled={files.length === 0}
           className="brutal-button bg-foreground text-background px-4 py-3.5 text-xs w-full disabled:opacity-30 flex items-center justify-center gap-2"
         >
-          {isGeneratingIcons ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Generating Icons…</>
-          ) : (
-            <><Download className="h-4 w-4" /> Download ZIP</>
-          )}
+          <Download className="h-4 w-4" /> Download ZIP
         </button>
         {isReady && (
           <p className="font-mono text-[9px] text-center text-muted-foreground mt-2 uppercase tracking-widest">

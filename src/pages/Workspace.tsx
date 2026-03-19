@@ -3,9 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Layers, Loader2, LogOut, History, PanelLeftClose, PanelRightClose } from "lucide-react";
 import { streamChat, type Msg } from "@/lib/stream-chat";
 import { parseExtensionFiles, analyzeManifest, type ExtensionFile, type ExtensionMeta } from "@/lib/extension-parser";
-import { createExtensionZip, createExtensionZipWithIcons, downloadBlob } from "@/lib/zip-export";
-import { generateIcons } from "@/lib/icon-generator";
-// import { supabase } from "@/integrations/supabase/client";
+import { createExtensionZip, downloadBlob } from "@/lib/zip-export";
 import { toast } from "sonner";
 import { HistorySidebar } from "@/components/HistorySidebar";
 import { ChatPanel } from "@/components/workspace/ChatPanel";
@@ -29,16 +27,10 @@ const Workspace = () => {
   const [meta, setMeta] = useState<ExtensionMeta>({ type: "unknown", permissions: [], warnings: [], issues: [] });
   const [activeFile, setActiveFile] = useState<string>("");
   const [showSuccess, setShowSuccess] = useState(false);
-  // const [projectId, setProjectId] = useState<string | null>(loadProjectId);
   const fullResponseRef = useRef("");
 
   // Mobile panel toggle
   const [mobilePanel, setMobilePanel] = useState<"chat" | "code" | "status">("chat");
-
-  // Icon generation
-  const [isGeneratingIcons, setIsGeneratingIcons] = useState(false);
-  const [previewIcon, setPreviewIcon] = useState<string | null>(null);
-  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
 
   // Typing animation
   const [visibleChars, setVisibleChars] = useState(0);
@@ -95,8 +87,6 @@ const Workspace = () => {
             if (!activeFile || !parsed.find(f => f.name === activeFile)) {
               setActiveFile(parsed[0]?.name || "");
             }
-            const allMsgs = [...allMessages, { role: "assistant" as const, content: fullResponseRef.current }];
-            // Switch to code view on mobile after generation
             setMobilePanel("code");
           } else {
             processResponse(fullResponseRef.current);
@@ -109,49 +99,14 @@ const Workspace = () => {
     }
   };
 
-  const generatePreviewIcon = async () => {
-    if (!files.length) return;
-    try {
-      setIsGeneratingPreview(true);
-      const manifestFile = files.find((f) => f.name === "manifest.json");
-      if (!manifestFile) return;
-      const icons = await generateIcons(manifestFile.content);
-      const iconBlob = icons["icon128.png"];
-      const reader = new FileReader();
-      reader.onloadend = () => setPreviewIcon(reader.result as string);
-      reader.readAsDataURL(iconBlob);
-    } catch (err) {
-      console.warn("Preview generation failed:", err);
-      toast.warning("Couldn't preview icon");
-    } finally {
-      setIsGeneratingPreview(false);
-    }
-  };
-
   const handleDownload = async () => {
     if (files.length === 0) return;
     try {
-      setIsGeneratingIcons(true);
-      const manifestFile = files.find((f) => f.name === "manifest.json");
-      let blob: Blob;
-      try {
-        if (manifestFile) {
-          const icons = await generateIcons(manifestFile.content);
-          blob = await createExtensionZipWithIcons(files, icons);
-        } else {
-          blob = await createExtensionZip(files);
-        }
-      } catch (iconErr) {
-        console.warn("Icon generation failed, falling back:", iconErr);
-        toast.warning("Icons couldn't be generated — downloading without icons");
-        blob = await createExtensionZip(files);
-      }
+      const blob = await createExtensionZip(files);
       downloadBlob(blob, "extension.zip");
       setShowSuccess(true);
     } catch {
       toast.error("Failed to create ZIP");
-    } finally {
-      setIsGeneratingIcons(false);
     }
   };
 
@@ -281,12 +236,8 @@ const Workspace = () => {
             warningsList={warningsList}
             infos={infos}
             isLoading={isLoading}
-            isGeneratingIcons={isGeneratingIcons}
-            isGeneratingPreview={isGeneratingPreview}
-            previewIcon={previewIcon}
             onFixErrors={() => sendMessage("Fix the following validation errors: " + errors.map(e => e.message).join(", "))}
             onDownload={handleDownload}
-            onGeneratePreviewIcon={generatePreviewIcon}
           />
         </div>
       </div>
