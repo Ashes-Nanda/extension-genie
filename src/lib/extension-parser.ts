@@ -92,14 +92,13 @@ export function analyzeManifest(files: ExtensionFile[]): ExtensionMeta {
       issues.push({ level: "warning", message: "Missing or empty description" });
     }
 
-    // ── Icon reference check ──
+    // ── Icon reference check (info-only, icons are optional) ──
     if (manifest.icons) {
       const iconValues = Object.values(manifest.icons) as string[];
       const fileNames = files.map((f) => f.name);
       for (const icon of iconValues) {
         if (!fileNames.includes(icon)) {
-          issues.push({ level: "error", message: `Missing icon file: ${icon} — referenced in manifest "icons" but not generated` });
-          warnings.push(`Missing icon file: ${icon}`);
+          issues.push({ level: "info", message: `Icon file not included: ${icon} — add your own before loading` });
         }
       }
     }
